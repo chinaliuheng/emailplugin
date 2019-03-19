@@ -11,8 +11,8 @@
    },
    "content_scripts": [ {
       "all_frames": false,
-      "css": [ "css/style.css","css/highlight.css" ],
-      "js": ["jquery-1.12.0.min.js","selector-generator.js","highlightRegex.min.js","Tdrag.js","controller.js"],
+      "css": [ "css/style.css","css/highlight.css", "css/jquery-confirm.css"],
+      "js": ["jquery-1.12.0.min.js","selector-generator.js","highlightRegex.min.js","Tdrag.js","controller.js", "js/jquery-confirm.js"],
       "matches": [ "<all_urls>" ],
       "run_at": "document_end"
    } ],
@@ -24,7 +24,7 @@
    "manifest_version": 2,
    "minimum_chrome_version": "21",
    "name": "mmcplugin",
-   "permissions": ["contextMenus", "activeTab", "clipboardWrite","cookies", "tabs", "storage", "unlimitedStorage", "webRequest", "webNavigation","webRequestBlocking", "http://*/*", "https://*/*" ],
+   "permissions": ["notifications","contextMenus", "activeTab", "clipboardWrite","cookies", "tabs", "storage", "unlimitedStorage", "webRequest", "webNavigation","webRequestBlocking", "http://*/*", "https://*/*" ],
    "update_url": "https://clients2.google.com/service/update2/crx",
    "version": "1.0.3",
    "web_accessible_resources": [ "images/*", "css/*", "editor.html","login.html", "js/*"]

@@ -15,7 +15,7 @@ function onUpdated(tabId, details, tab) {
         //当前打开的url为邮件后台
         // if (url.indexOf('email_content_detail') != -1) {
 
-        if ('complete' == (details || {}).status && url.indexOf('chrome://') == -1) {
+        if ('complete' == (details || {}).status && url.indexOf('chrome:') === -1) {
             chrome.tabs.executeScript(
                 tab.id, { code: "document.referrer;" },
                 // _=>chrome.runtime.lastError
@@ -24,33 +24,32 @@ function onUpdated(tabId, details, tab) {
                         var referUrl = result[0];
                         if (referUrl.indexOf('email_content.php') !== -1 && url.indexOf('email_content_detail.php') == -1) {
 
-                            if (referUrl != '' && confirm("Is the page email landingPage?")) {
+                            if (referUrl != '') {
+                                var emailid;
                                 var emailUniqueid = getQueryString(referUrl, 'EmailUniqueID');
                                 if (emailUniqueid) {
-                                    //获取当前的邮件以及系统匹配的商家
+                                    cacheWorker('set', 'jumpstatus_' + emailUniqueid, 1);
+                                    cacheWorker('set', 'landingpage_' + emailUniqueid, url);
                                     getEmailMatchInfo(emailUniqueid).then(function(response) {
-                                        var id = response.data.ID;
+                                        emailid = response.data.ID;
                                         if (response.data.matchinfo.length > 0) {
                                             var matchWrong = new Array();
-                                            // console.log(typeof(matchResult));
                                             $(response.data.matchinfo).each(function(index, el) {
                                                 if (url.indexOf(el.preurl) === -1) {
                                                     matchWrong.push(el);
                                                 }
                                             });
-
                                             if (matchWrong.length > 0) {
                                                 cacheWorker('set', 'error_match_' + emailUniqueid, JSON.stringify(matchWrong));
                                                 cacheWorker('set', 'landingpage_' + emailUniqueid, url);
                                             }
-
+                                        }
+                                        if (emailid > 0) {
                                             chrome.tabs.getAllInWindow(function(alltabs) {
                                                 $(alltabs).each(function(index, tabitem) {
                                                     var url_choose = tabitem.url;
                                                     var tabId_choose = tabitem.id;
-                                                    console.log(tabitem);
-                                                    if (url_choose.indexOf(id) != -1) {
-
+                                                    if (url_choose.indexOf(emailid) !== -1) {
                                                         chrome.tabs.update(tabId_choose, { highlighted: true });
                                                         chrome.tabs.reload(tabId_choose, function() {});
                                                         return;
@@ -66,6 +65,12 @@ function onUpdated(tabId, details, tab) {
                 }
             );
         }
+
+        //获取当前的邮件以及系统匹配的商家
+        // getEmailMatchInfo(emailUniqueid).then(function(response) {
+        //     var id = response.data.ID;
+        //     
+        // });
 
         //刷新指定的coupon list 商家页面
         if (new RegExp("fill=&", 'g').test(url)) {
@@ -110,17 +115,17 @@ function onUpdated(tabId, details, tab) {
         if (checkCache()) {
             clearCache();
         }
-        getDomainMMC(tabId, domain).then(function(resp) {
-            if ((resp.code == 0 && resp.data.length > 0) || resp.code == -2) {
-                setTimeout(function() {
-                    chrome.tabs.sendMessage(tabId, { action: "popAdd", tabid: tabId, domain: domain, page: localTokenCheck() }, function(response) {});
+        // getDomainMMC(tabId, domain).then(function(resp) {
+        //     if ((resp.code == 0 && resp.data.length > 0) || resp.code == -2) {
+        //         setTimeout(function() {
+        //             chrome.tabs.sendMessage(tabId, { action: "popAdd", tabid: tabId, domain: domain, page: localTokenCheck() }, function(response) {});
 
-                }, 1000);
-            } else {
-                console.log('not support domain...');
-            }
+        //         }, 1000);
+        //     } else {
+        //         console.log('not support domain...');
+        //     }
 
-        });
+        // });
     }
 }
 
@@ -210,7 +215,6 @@ function sleepAndDoing(time, value = 1) {
     })
 }
 
-
 //图标点击事件
 chrome.browserAction.onClicked.addListener(onClicked);
 
@@ -220,7 +224,6 @@ function onClicked(tabId) {
             chrome.tabs.sendMessage(tabId[0].id, { action: "showPop", tabid: tabId, domain: domain, page: localTokenCheck() }, function(response) {});
         });
 }
-
 
 function get_domain_from_url(url) {
     try {
@@ -268,6 +271,12 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     if (request.action == 'getLandingPage') {
         var emailiuniqueid = request.uniqueid;
         sendResponse({ data: cacheWorker('get', 'landingpage_' + emailiuniqueid) });
+        return true;
+    }    
+
+    if (request.action == 'getJumpInfo') {
+        var emailiuniqueid = request.uniqueid;
+        sendResponse({ data:{ status: cacheWorker('get', 'jumpstatus_' + emailiuniqueid), url: cacheWorker('get', 'landingpage_' + emailiuniqueid)}});
         return true;
     }
 
