@@ -15,14 +15,14 @@ function onUpdated(tabId, details, tab) {
         //当前打开的url为邮件后台
         // if (url.indexOf('email_content_detail') != -1) {
 
-        if ('complete' == (details || {}).status && url.indexOf('chrome:') === -1) {
+        if ('complete' == (details || {}).status && url.indexOf('chrome') === -1) {
             chrome.tabs.executeScript(
                 tab.id, { code: "document.referrer;" },
                 // _=>chrome.runtime.lastError
                 function(result) {
                     if (result && result.length > 0) {
                         var referUrl = result[0];
-                        if (referUrl.indexOf('email_content.php') !== -1 && url.indexOf('email_content_detail.php') == -1) {
+                        if (referUrl.indexOf('email_content.php') !== -1 && url.indexOf('email_content_detail.php') == -1 ) {
 
                             if (referUrl != '') {
                                 var emailid;
@@ -269,20 +269,46 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     }
 
     if (request.action == 'getLandingPage') {
-        var emailiuniqueid = request.uniqueid;
-        sendResponse({ data: cacheWorker('get', 'landingpage_' + emailiuniqueid) });
+        var emailuniqueid = request.uniqueid;
+        sendResponse({ data: cacheWorker('get', 'landingpage_' + emailuniqueid) });
         return true;
-    }    
+    }
+
+    if (request.action == 'addRemoveLog') {
+        var emailuniqueid = request.uniqueid;
+        var site = request.site;
+        var merchantid = request.merchantid;
+        var msg = 'faild';
+        addRemoveLog(emailuniqueid, site, merchantid).then(function(res) {
+            if (res.data == 'ok') {
+                msg = 'success';
+            }
+            sendResponse({ data: msg });
+        });
+        return true;
+    }  
+
+    if (request.action == 'checkEmailIsSCan') {
+        var emailuniqueid = request.uniqueid;
+        var msg = 'faild';
+        checkEmailIsSCan(emailuniqueid).then(function(res) {
+            if (res.data === true) {
+                msg = 'success';
+            }
+            sendResponse({ data: msg });
+        });
+        return true;
+    }
 
     if (request.action == 'getJumpInfo') {
-        var emailiuniqueid = request.uniqueid;
-        sendResponse({ data:{ status: cacheWorker('get', 'jumpstatus_' + emailiuniqueid), url: cacheWorker('get', 'landingpage_' + emailiuniqueid)}});
+        var emailuniqueid = request.uniqueid;
+        sendResponse({ data:{ status: cacheWorker('get', 'jumpstatus_' + emailuniqueid), url: cacheWorker('get', 'landingpage_' + emailuniqueid)}});
         return true;
     }
 
     if (request.action == 'getErrorMatch') {
-        var emailiuniqueid = request.uniqueid;
-        sendResponse({ data: cacheWorker('get', 'error_match_' + emailiuniqueid) });
+        var emailuniqueid = request.uniqueid;
+        sendResponse({ data: cacheWorker('get', 'error_match_' + emailuniqueid) });
         return true;
     }
 
@@ -306,6 +332,17 @@ function Login(user, pass) {
 //getEmailMatchInfo
 function getEmailMatchInfo(emailuniqueid) {
     var apiurl = "https://go.soarinfotech.com/api.php?action=getEmailInfo&uniqueid=" + emailuniqueid;
+    return ajaxApi(apiurl);
+}
+
+//add remove log
+function checkEmailIsSCan(emailuniqueid) {
+    var apiurl = "https://go.soarinfotech.com/api.php?action=checkEmailIsSCan&uniqueid=" + emailuniqueid;
+    return ajaxApi(apiurl);
+}
+//add remove log
+function addRemoveLog(emailuniqueid, site, merchantid) {
+    var apiurl = "https://go.soarinfotech.com/api.php?action=addRemoveLog&uniqueid=" + emailuniqueid + "&site=" + site + "&merchantid=" + merchantid;
     return ajaxApi(apiurl);
 }
 

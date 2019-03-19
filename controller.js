@@ -27,70 +27,81 @@ setTimeout(() => {
         var emailuniqueid = $('input[name=emailuniqueid]').val();
         if (emailuniqueid.length>0) {
 
-            chrome.runtime.sendMessage({ action: "getJumpInfo", uniqueid: emailuniqueid }, function(response) {
-                console.log(response);
-                landingPgae = response.data.url;
-                if (response.data.status == 1 && landingPgae != '') {
-                    message = "<span style='font-size: 16px;'>Is this Landing Page : " + "\r<span style='color:red'>" + landingPgae + '</span>?</span>';
+            //check has match info
+            chrome.runtime.sendMessage({ action: "checkEmailIsSCan", uniqueid: emailuniqueid }, function(scanResult) {
+                // 未检测过邮件
+                console.log(scanResult.data);
+                if (scanResult.data == 'faild') {
+                    chrome.runtime.sendMessage({ action: "getJumpInfo", uniqueid: emailuniqueid }, function(response) {
+                        // console.log(response);
+                        landingPgae = response.data.url;
+                        if (response.data.status == 1 && landingPgae != '') {
+                            message = "<span style='font-size: 16px;'>Is this Landing Page : " + "\r<span style='color:red'>" + landingPgae + '</span>?</span>';
 
-                    $.confirm({
-                        title: 'Confirm',
-                        boxWidth: '40%',
-                        useBootstrap: false,
-                        content: message,
-                        buttons: {
-                            confirm: function () {
-                                //append landing page
-                                chrome.runtime.sendMessage({ action: "getLandingPage", uniqueid: emailuniqueid }, function(response) {
-                                    // console.log(response);
-                                    if (response.data) {
-                                        $("table[name='matchresult'] td a").each(function(index, el) {
-                                            if ($(el).html().indexOf('Add Coupon') !== -1 || $(el).html().indexOf('Add Deal') !== -1 || $(el).html().indexOf('+') !== -1) {
-                                                var cururl = $(el).attr('href');
-                                                if (cururl.indexOf('c_dst_url') == -1) {
-                                                    cururl += '&c_dst_url=' + encodeURIComponent(response.data);
-                                                    $(el).attr('href', cururl);
-                                                } 
-                                            } 
+                            $.confirm({
+                                title: 'Confirm',
+                                boxWidth: '40%',
+                                useBootstrap: false,
+                                content: message,
+                                buttons: {
+                                    confirm: function () {
+                                        //append landing page
+                                        chrome.runtime.sendMessage({ action: "getLandingPage", uniqueid: emailuniqueid }, function(response) {
+                                            // console.log(response);
+                                            if (response.data) {
+                                                $("table[name='matchresult'] td a").each(function(index, el) {
+                                                    if ($(el).html().indexOf('Add Coupon') !== -1 || $(el).html().indexOf('Add Deal') !== -1 || $(el).html().indexOf('+') !== -1) {
+                                                        var cururl = $(el).attr('href');
+                                                        if (cururl.indexOf('c_dst_url') == -1) {
+                                                            cururl += '&c_dst_url=' + encodeURIComponent(response.data);
+                                                            $(el).attr('href', cururl);
+                                                        } 
+                                                    } 
+                                                });
+                                            }
                                         });
-                                    }
-                                });
 
-                                chrome.runtime.sendMessage({ action: "getErrorMatch", uniqueid: emailuniqueid }, function(response) {
-                                     if (response.data && response.data.length>0) {
-                                        errorMatch = $.parseJSON(response.data); 
-                                        $(errorMatch).each(function(index, el) {
-                                            console.log(el);
-                                            var site = el.site;
-                                            var mid = el.ID;
-                                            var wrongdomain = el.OriginalUrl;
-                                            var tdkey = site + '-' + mid;
-                                            log = "<span style='font-size: 16px;'>system will remove match wrong info : " + site + '-' + mid + "\r<span style='color:red'>"+ wrongdomain +"</span>?</span>";
+                                        chrome.runtime.sendMessage({ action: "getErrorMatch", uniqueid: emailuniqueid }, function(response) {
+                                             if (response.data && response.data.length>0) {
+                                                errorMatch = $.parseJSON(response.data); 
+                                                $(errorMatch).each(function(index, el) {
+                                                    console.log(el);
+                                                    var site = el.site;
+                                                    var mid = el.ID;
+                                                    var wrongdomain = el.OriginalUrl;
+                                                    var tdkey = site + '-' + mid;
+                                                    log = "<span style='font-size: 16px;'>system will remove match wrong info : " + site + '-' + mid + "\r<span style='color:red'>"+ wrongdomain +"</span>?</span>";
 
-                                            $.confirm({
-                                                title: 'Confirm!',
-                                                boxWidth: '40%',
-                                                useBootstrap: false,
-                                                content: log,
-                                                buttons: {
-                                                    confirm: function () {
-                                                        $("td[data-siteinfo='"+ tdkey +"']").remove();
-                                                    },
-                                                    cancel: function () {
-                                                        // $.alert('Canceled!');
-                                                    }
-                                                }
-                                            });
+                                                    $.confirm({
+                                                        title: 'Confirm!',
+                                                        boxWidth: '40%',
+                                                        useBootstrap: false,
+                                                        content: log,
+                                                        buttons: {
+                                                            confirm: function () {
+                                                                $("td[data-siteinfo='"+ tdkey +"']").remove();
+                                                                chrome.runtime.sendMessage({ action: "addRemoveLog", uniqueid: emailuniqueid, site: site, merchantid: mid }, function(response) {
+                                                                    console.log(response);
+                                                                });
+                                                            },
+                                                            cancel: function () {
+                                                                // $.alert('Canceled!');
+                                                            }
+                                                        }
+                                                    });
+                                                });
+                                            }
                                         });
+                                    },
+                                    cancel: function () {
+                                        // $.alert('Canceled!');
                                     }
-                                });
-                            },
-                            cancel: function () {
-                                // $.alert('Canceled!');
-                            }
+                                }
+                            });
                         }
                     });
                 }
+                
             });
         }
     }
