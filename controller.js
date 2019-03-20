@@ -24,11 +24,7 @@ setTimeout(() => {
     }
 
     // if (window.location.href.indexOf('email_content_detail') !== -1) {
-    //     var emailuniqueid = $('input[name=emailuniqueid]').val();
-    //     var emailid = getQueryString(window.location.href, 'emailid');
-    //     if (emailuniqueid.length>0) {
 
-    //     }
     // }
 
     if (window.location.href.indexOf('promo.php') !== -1 && window.location.href.indexOf('emailid') !== -1) {
@@ -48,9 +44,7 @@ setTimeout(() => {
                             var merchantid = $('#merchantid').val();
 
                             if (response.data.status == 1) {
-
                                 message = "<span style='font-size: 16px;color:red'>" + landingPage + '</span>';
-
                                 $.confirm({
                                     title: 'Confirm Landing Page?',
                                     boxWidth: '40%',
@@ -68,7 +62,7 @@ setTimeout(() => {
                                                         if (wrongmid == merchantid && site == wrongsite) {
                                                             var wrongdomain = el.OriginalUrl;
                                                             
-                                                            log = "<span style='font-size: 16px;'> " + wrongsite + '-' + wrongmid + "<span style='color:red'>"+ wrongdomain +"</span><br>Landing page:"+ landingPage +"</span>";
+                                                            log = "<span style='font-size: 16px;'>Error Domain:<span style='color:red'>"+ wrongdomain +"</span><br><span style='font-size: 16px;'>Landing Page:<span style='color:green'>"+ landingPage +"</span>";
                                                             $.confirm({
                                                                 title: 'System will remove match wrong info ',
                                                                 boxWidth: '40%',
@@ -90,6 +84,8 @@ setTimeout(() => {
                                                             $('#c_dst_url').val(landingPage);
                                                         }
                                                     });
+                                                } else {
+                                                    $('#c_dst_url').val(landingPage);
                                                 }
                                             });
                                              
@@ -229,6 +225,11 @@ $(function() {
     chrome.extension.onRequest.addListener(function(request, sender, sendResponse) {
 
         if (request.action == "refreshwd") {
+            window.location.reload();
+            return;
+        }        
+
+        if (request.action == "removeemailcontent") {
             window.location.reload();
             return;
         }

@@ -1,5 +1,6 @@
 var domain = "";
 var tabid = "";
+var maxmin = 6;
 var base = new Base64();
 //浏览器加载完成
 chrome.tabs.onUpdated.addListener(onUpdated);
@@ -11,61 +12,65 @@ function onUpdated(tabId, details, tab) {
         var reload = false;
         var url = tab.url;
 
-        domain = get_domain_from_url(url);
+        // domain = get_domain_from_url(url);
         //当前打开的url为邮件后台
         // if (url.indexOf('email_content_detail') != -1) {
+        setTimeout(function () {
+            for (let i=0; i<10; i++) {
+                if (('complete' == (details || {}).status || i>maxmin) && url.indexOf('chrome') === -1 && url.indexOf('extension') === -1) {
+                    // console.log(i);
+                    chrome.tabs.executeScript(
+                        tab.id, { code: "document.referrer;" },
+                        // _=>chrome.runtime.lastError
+                        function(result) {
+                            if (result && result.length > 0) {
+                                var referUrl = result[0];
+                                if (referUrl.indexOf('email_content.php') !== -1 && url.indexOf('email_content_detail.php') == -1 ) {
 
-        if ('complete' == (details || {}).status && url.indexOf('chrome') === -1 && url.indexOf('extension') === -1) {
-            chrome.tabs.executeScript(
-                tab.id, { code: "document.referrer;" },
-                // _=>chrome.runtime.lastError
-                function(result) {
-                    if (result && result.length > 0) {
-                        var referUrl = result[0];
-                        if (referUrl.indexOf('email_content.php') !== -1 && url.indexOf('email_content_detail.php') == -1 ) {
-
-                            if (referUrl != '') {
-                                var emailid;
-                                var emailUniqueid = getQueryString(referUrl, 'EmailUniqueID');
-                                if (emailUniqueid) {
-                                    cacheWorker('set', 'jumpstatus_' + emailUniqueid, 1);
-                                    cacheWorker('set', 'landingpage_' + emailUniqueid, url);
-                                    getEmailMatchInfo(emailUniqueid).then(function(response) {
-                                        emailid = response.data.ID;
-                                        if (response.data.matchinfo.length > 0) {
-                                            var matchWrong = new Array();
-                                            $(response.data.matchinfo).each(function(index, el) {
-                                                if (url.indexOf(el.preurl) === -1) {
-                                                    matchWrong.push(el);
+                                    if (referUrl != '') {
+                                        var emailid;
+                                        var emailUniqueid = getQueryString(referUrl, 'EmailUniqueID');
+                                        if (emailUniqueid) {
+                                            cacheWorker('set', 'jumpstatus_' + emailUniqueid, 1);
+                                            cacheWorker('set', 'landingpage_' + emailUniqueid, url);
+                                            getEmailMatchInfo(emailUniqueid).then(function(response) {
+                                                emailid = response.data.ID;
+                                                if (response.data.matchinfo.length > 0) {
+                                                    var matchWrong = new Array();
+                                                    $(response.data.matchinfo).each(function(index, el) {
+                                                        if (url.indexOf(el.preurl) === -1) {
+                                                            matchWrong.push(el);
+                                                        }
+                                                    });
+                                                    if (matchWrong.length > 0) {
+                                                        cacheWorker('set', 'error_match_' + emailUniqueid, JSON.stringify(matchWrong));
+                                                        cacheWorker('set', 'landingpage_' + emailUniqueid, url);
+                                                    }
                                                 }
+                                                // if (emailid > 0) {
+                                                //     chrome.tabs.getAllInWindow(function(alltabs) {
+                                                //         $(alltabs).each(function(index, tabitem) {
+                                                //             var url_choose = tabitem.url;
+                                                //             var tabId_choose = tabitem.id;
+                                                //             chrome.tabs.update(tabId_choose, { highlighted: false });
+                                                //             if (url_choose.indexOf(emailid) !== -1) {
+                                                //                 chrome.tabs.update(tabId_choose, { highlighted: true });
+                                                //                 // chrome.tabs.reload(tabId_choose, function() {});
+                                                //                 return;
+                                                //             }
+                                                //         });
+                                                //     });
+                                                // }
                                             });
-                                            if (matchWrong.length > 0) {
-                                                cacheWorker('set', 'error_match_' + emailUniqueid, JSON.stringify(matchWrong));
-                                                cacheWorker('set', 'landingpage_' + emailUniqueid, url);
-                                            }
                                         }
-                                        // if (emailid > 0) {
-                                        //     chrome.tabs.getAllInWindow(function(alltabs) {
-                                        //         $(alltabs).each(function(index, tabitem) {
-                                        //             var url_choose = tabitem.url;
-                                        //             var tabId_choose = tabitem.id;
-                                        //             chrome.tabs.update(tabId_choose, { highlighted: false });
-                                        //             if (url_choose.indexOf(emailid) !== -1) {
-                                        //                 chrome.tabs.update(tabId_choose, { highlighted: true });
-                                        //                 // chrome.tabs.reload(tabId_choose, function() {});
-                                        //                 return;
-                                        //             }
-                                        //         });
-                                        //     });
-                                        // }
-                                    });
+                                    }
                                 }
                             }
                         }
-                    }
+                    );
                 }
-            );
-        }
+            }
+        }, 1000);
 
         //获取当前的邮件以及系统匹配的商家
         // getEmailMatchInfo(emailUniqueid).then(function(response) {
@@ -276,34 +281,38 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     }
 
     if (request.action == 'addRemoveLog') {
+        chrome.tabs.remove(sender.tab.id, function() {});
         var emailuniqueid = request.uniqueid;
         var emailid = request.emailid;
         var site = request.site;
         var merchantid = request.merchantid;
         var tdkey = site + '-' + merchantid;
+        // alert(tdkey);
         var msg = 'faild';
         addRemoveLog(emailuniqueid, site, merchantid).then(function(res) {
             if (res.data == 'ok') {
                 msg = 'success';
             }
-            sendResponse({ data: msg });
-            chrome.tabs.remove(sender.tab.id, function() {});
 
             chrome.tabs.getAllInWindow(function(alltabs) {
                 $(alltabs).each(function(index, tabitem) {
                     var url_choose = tabitem.url;
+                    chrome.tabs.update(tabId_choose, { active: false });
                     var tabId_choose = tabitem.id;
-                    chrome.tabs.update(tabId_choose, { highlighted: false });
-                    if (url_choose.indexOf(emailid) !== -1) {
-                        chrome.tabs.update(tabId_choose, { highlighted: true });
-                        // chrome.tabs.reload(tabId_choose, function() {});
-                        $("td[data-siteinfo='"+ tdkey +"']").remove();
-                        return;
+                    if (url_choose.indexOf(emailid) !== -1 && url_choose.indexOf('email_content_detail') !== -1) {
+                        chrome.tabs.update(tabId_choose, { active: true });
+                        sendToController('removeemailcontent', function() {});
+                        // console.log(url_choose);
+                        // console.log("td[data-siteinfo='"+ tdkey +"']");
+                        // $("td[data-siteinfo='"+ tdkey +"']").remove();
+                        chrome.tabs.reload(tabId_choose, function() {});
                     }
                 });
             });
+            return true;
+            // sendResponse({ data: msg });
         });
-        return true;
+        
     }  
 
     if (request.action == 'checkEmailIsScan') {
