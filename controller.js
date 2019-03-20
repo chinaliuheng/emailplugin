@@ -23,87 +23,129 @@ setTimeout(() => {
         }
     }
 
-    if (window.location.href.indexOf('email_content_detail') !== -1) {
-        var emailuniqueid = $('input[name=emailuniqueid]').val();
-        if (emailuniqueid.length>0) {
+    // if (window.location.href.indexOf('email_content_detail') !== -1) {
+    //     var emailuniqueid = $('input[name=emailuniqueid]').val();
+    //     var emailid = getQueryString(window.location.href, 'emailid');
+    //     if (emailuniqueid.length>0) {
 
-            //check has match info
-            chrome.runtime.sendMessage({ action: "checkEmailIsSCan", uniqueid: emailuniqueid }, function(scanResult) {
-                // 未检测过邮件
-                console.log(scanResult.data);
-                if (scanResult.data == 'faild') {
-                    chrome.runtime.sendMessage({ action: "getJumpInfo", uniqueid: emailuniqueid }, function(response) {
-                        // console.log(response);
-                        landingPgae = response.data.url;
-                        if (response.data.status == 1 && landingPgae != '') {
-                            message = "<span style='font-size: 16px;'>Is this Landing Page : " + "\r<span style='color:red'>" + landingPgae + '</span>?</span>';
+    //     }
+    // }
 
-                            $.confirm({
-                                title: 'Confirm',
-                                boxWidth: '40%',
-                                useBootstrap: false,
-                                content: message,
-                                buttons: {
-                                    confirm: function () {
-                                        //append landing page
-                                        chrome.runtime.sendMessage({ action: "getLandingPage", uniqueid: emailuniqueid }, function(response) {
-                                            // console.log(response);
-                                            if (response.data) {
-                                                $("table[name='matchresult'] td a").each(function(index, el) {
-                                                    if ($(el).html().indexOf('Add Coupon') !== -1 || $(el).html().indexOf('Add Deal') !== -1 || $(el).html().indexOf('+') !== -1) {
-                                                        var cururl = $(el).attr('href');
-                                                        if (cururl.indexOf('c_dst_url') == -1) {
-                                                            cururl += '&c_dst_url=' + encodeURIComponent(response.data);
-                                                            $(el).attr('href', cururl);
-                                                        } 
-                                                    } 
-                                                });
-                                            }
-                                        });
+    if (window.location.href.indexOf('promo.php') !== -1 && window.location.href.indexOf('emailid') !== -1) {
+        var emailid = getQueryString(window.location.href, 'emailid');
+        chrome.runtime.sendMessage({ action: "getEmailUniqueidByID", emailid: emailid }, function(response) {
+            if (response.data) {
+                emailuniqueid = response.data;
+                chrome.runtime.sendMessage({ action: "checkEmailIsScan", uniqueid: emailuniqueid }, function(scanResult) {
+                    // 未检测过邮件
+                    // console.log(scanResult.data);
+                    if (scanResult.data == 'faild') {
+                        chrome.runtime.sendMessage({ action: "getJumpInfo", uniqueid: emailuniqueid, emailid: emailid }, function(response) {
+                            console.log(response);
+                            landingPage = response.data.url;                    
+                            var cururl = window.location.href;
+                            var site = $('#site').val();
+                            var merchantid = $('#merchantid').val();
 
-                                        chrome.runtime.sendMessage({ action: "getErrorMatch", uniqueid: emailuniqueid }, function(response) {
-                                             if (response.data && response.data.length>0) {
-                                                errorMatch = $.parseJSON(response.data); 
-                                                $(errorMatch).each(function(index, el) {
-                                                    console.log(el);
-                                                    var site = el.site;
-                                                    var mid = el.ID;
-                                                    var wrongdomain = el.OriginalUrl;
-                                                    var tdkey = site + '-' + mid;
-                                                    log = "<span style='font-size: 16px;'>system will remove match wrong info : " + site + '-' + mid + "\r<span style='color:red'>"+ wrongdomain +"</span>?</span>";
+                            if (response.data.status == 1) {
 
-                                                    $.confirm({
-                                                        title: 'Confirm!',
-                                                        boxWidth: '40%',
-                                                        useBootstrap: false,
-                                                        content: log,
-                                                        buttons: {
-                                                            confirm: function () {
-                                                                $("td[data-siteinfo='"+ tdkey +"']").remove();
-                                                                chrome.runtime.sendMessage({ action: "addRemoveLog", uniqueid: emailuniqueid, site: site, merchantid: mid }, function(response) {
-                                                                    console.log(response);
-                                                                });
-                                                            },
-                                                            cancel: function () {
-                                                                // $.alert('Canceled!');
-                                                            }
+                                message = "<span style='font-size: 16px;color:red'>" + landingPage + '</span>';
+
+                                $.confirm({
+                                    title: 'Confirm Landing Page?',
+                                    boxWidth: '40%',
+                                    useBootstrap: false,
+                                    content: message,
+                                    buttons: {
+                                        confirm: function () {
+                                            chrome.runtime.sendMessage({ action: "getErrorMatch", uniqueid: emailuniqueid, emailid: emailid}, function(response) {
+                                                 if (response.data && response.data.length>0) {
+                                                    errorMatch = $.parseJSON(response.data); 
+
+                                                    $(errorMatch).each(function(index, el) {
+                                                        var wrongsite = el.site;
+                                                        var wrongmid = el.ID;
+                                                        if (wrongmid == merchantid && site == wrongsite) {
+                                                            var wrongdomain = el.OriginalUrl;
+                                                            
+                                                            log = "<span style='font-size: 16px;'> " + wrongsite + '-' + wrongmid + "<span style='color:red'>"+ wrongdomain +"</span><br>Landing page:"+ landingPage +"</span>";
+                                                            $.confirm({
+                                                                title: 'System will remove match wrong info ',
+                                                                boxWidth: '40%',
+                                                                useBootstrap: false,
+                                                                content: log,
+                                                                buttons: {
+                                                                    confirm: function () {
+                                                                        chrome.runtime.sendMessage({ action: "addRemoveLog", uniqueid: emailuniqueid, emailid: emailid, site: wrongsite, merchantid: wrongmid }, function(response) {
+                                                                            console.log(response);
+                                                                        });
+                                                                    },
+                                                                    cancel: function () {
+                                                                        // $.alert('Canceled!');
+                                                                    }
+                                                                }
+                                                            });
+                                                        } else {
+                                                            //未匹配错误的站点商家
+                                                            $('#c_dst_url').val(landingPage);
                                                         }
                                                     });
-                                                });
-                                            }
-                                        });
-                                    },
-                                    cancel: function () {
-                                        // $.alert('Canceled!');
+                                                }
+                                            });
+                                             
+                                            //append landing page
+                                            
+                                            // chrome.runtime.sendMessage({ action: "getLandingPage", uniqueid: emailuniqueid, emailid: emailid }, function(response) {
+                                            //     if (response.data) {
+                                            //         $("table[name='matchresult'] td a").each(function(index, el) {
+                                            //             if ($(el).html().indexOf('Add Coupon') !== -1 || $(el).html().indexOf('Add Deal') !== -1 || $(el).html().indexOf('+') !== -1) {
+                                            //                 var cururl = $(el).attr('href');
+                                            //                 if (cururl.indexOf('c_dst_url') == -1) {
+                                            //                     cururl += '&c_dst_url=' + encodeURIComponent(response.data);
+                                            //                     $(el).attr('href', cururl);
+                                            //                 } 
+                                            //             } 
+                                            //         });
+                                            //     }
+                                            // });
+                                            // chrome.runtime.sendMessage({ action: "getLandingPage", uniqueid: emailuniqueid, emailid: emailid }, function(response) {
+                                            //     if (response.data) {
+                                            //         $("table[name='matchresult'] td a").each(function(index, el) {
+                                            //             if ($(el).html().indexOf('Add Coupon') !== -1 || $(el).html().indexOf('Add Deal') !== -1 || $(el).html().indexOf('+') !== -1) {
+                                            //                 var cururl = $(el).attr('href');
+                                            //                 if (cururl.indexOf('c_dst_url') == -1) {
+                                            //                     cururl += '&c_dst_url=' + encodeURIComponent(response.data);
+                                            //                     $(el).attr('href', cururl);
+                                            //                 } 
+                                            //             } 
+                                            //         });
+                                            //     }
+                                            // });
+
+                                        },
+                                        cancel: function () {
+
+                                            chrome.runtime.sendMessage({ action: "closeCurrentTab", uniqueid: emailuniqueid, site: site, merchantid: merchantid}, function(response) {
+                                                console.log(response);
+                                            });
+                                            // $.alert('Canceled!');
+                                            // close 当前tab页面
+                                            // chrome.tabs.query(
+                                            //     { currentWindow: true, active: true },
+                                            //     function (tabArray) {
+                                            //         console.log(tabArray[0]);
+                                            //         // chrome.tabs.remove(tabArray[0], function() {});
+                                            //     }
+                                            // );
+                                        }
                                     }
-                                }
-                            });
-                        }
-                    });
-                }
-                
-            });
-        }
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+        });
     }
 }, 1000);
 
@@ -114,8 +156,6 @@ $(function() {
         // alert(window.location.href + window.location.hash);
         var base = new Base64();
         var cur_url = base.encode(window.location.href);
-
-        // alert(window.location.href + window.location.hash);
 
         if (request.page == 1) {
             var p = "editor.html";
@@ -136,6 +176,7 @@ $(function() {
                 // hide plugin
                 chrome.runtime.sendMessage({ action: "getIsHide" }, function(response) {
                     var hideplugin = response.data;
+                    console.log(hideplugin);
                     if (hideplugin) {
                         $("#coupertcontainer").hide();
                         return false;
@@ -228,7 +269,7 @@ $(function() {
         } else if (typeof document.body != 'undefined') {
             bodyTop = document.body.scrollTop;
         }
-        return bodyTop
+        return bodyTop;
     }
 });
 

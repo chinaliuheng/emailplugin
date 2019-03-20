@@ -15,7 +15,7 @@ function onUpdated(tabId, details, tab) {
         //当前打开的url为邮件后台
         // if (url.indexOf('email_content_detail') != -1) {
 
-        if ('complete' == (details || {}).status && url.indexOf('chrome') === -1) {
+        if ('complete' == (details || {}).status && url.indexOf('chrome') === -1 && url.indexOf('extension') === -1) {
             chrome.tabs.executeScript(
                 tab.id, { code: "document.referrer;" },
                 // _=>chrome.runtime.lastError
@@ -44,19 +44,20 @@ function onUpdated(tabId, details, tab) {
                                                 cacheWorker('set', 'landingpage_' + emailUniqueid, url);
                                             }
                                         }
-                                        if (emailid > 0) {
-                                            chrome.tabs.getAllInWindow(function(alltabs) {
-                                                $(alltabs).each(function(index, tabitem) {
-                                                    var url_choose = tabitem.url;
-                                                    var tabId_choose = tabitem.id;
-                                                    if (url_choose.indexOf(emailid) !== -1) {
-                                                        chrome.tabs.update(tabId_choose, { highlighted: true });
-                                                        chrome.tabs.reload(tabId_choose, function() {});
-                                                        return;
-                                                    }
-                                                });
-                                            });
-                                        }
+                                        // if (emailid > 0) {
+                                        //     chrome.tabs.getAllInWindow(function(alltabs) {
+                                        //         $(alltabs).each(function(index, tabitem) {
+                                        //             var url_choose = tabitem.url;
+                                        //             var tabId_choose = tabitem.id;
+                                        //             chrome.tabs.update(tabId_choose, { highlighted: false });
+                                        //             if (url_choose.indexOf(emailid) !== -1) {
+                                        //                 chrome.tabs.update(tabId_choose, { highlighted: true });
+                                        //                 // chrome.tabs.reload(tabId_choose, function() {});
+                                        //                 return;
+                                        //             }
+                                        //         });
+                                        //     });
+                                        // }
                                     });
                                 }
                             }
@@ -115,17 +116,17 @@ function onUpdated(tabId, details, tab) {
         if (checkCache()) {
             clearCache();
         }
-        // getDomainMMC(tabId, domain).then(function(resp) {
-        //     if ((resp.code == 0 && resp.data.length > 0) || resp.code == -2) {
-        //         setTimeout(function() {
-        //             chrome.tabs.sendMessage(tabId, { action: "popAdd", tabid: tabId, domain: domain, page: localTokenCheck() }, function(response) {});
+        getDomainMMC(tabId, domain).then(function(resp) {
+            if ((resp.code == 0 && resp.data.length > 0) || resp.code == -2) {
+                setTimeout(function() {
+                    chrome.tabs.sendMessage(tabId, { action: "popAdd", tabid: tabId, domain: domain, page: localTokenCheck() }, function(response) {});
 
-        //         }, 1000);
-        //     } else {
-        //         console.log('not support domain...');
-        //     }
+                }, 1000);
+            } else {
+                console.log('not support domain...');
+            }
 
-        // });
+        });
     }
 }
 
@@ -242,7 +243,6 @@ function get_domain_from_url(url) {
     }
 }
 
-
 //监听 controller view 消息
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     var hllock = false;
@@ -270,28 +270,46 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
     if (request.action == 'getLandingPage') {
         var emailuniqueid = request.uniqueid;
-        sendResponse({ data: cacheWorker('get', 'landingpage_' + emailuniqueid) });
+        var emailid = request.emailid;
+        sendResponse({ data: cacheWorker('get', 'landingpage_' + emailid) });
         return true;
     }
 
     if (request.action == 'addRemoveLog') {
         var emailuniqueid = request.uniqueid;
+        var emailid = request.emailid;
         var site = request.site;
         var merchantid = request.merchantid;
+        var tdkey = site + '-' + merchantid;
         var msg = 'faild';
         addRemoveLog(emailuniqueid, site, merchantid).then(function(res) {
             if (res.data == 'ok') {
                 msg = 'success';
             }
             sendResponse({ data: msg });
+            chrome.tabs.remove(sender.tab.id, function() {});
+
+            chrome.tabs.getAllInWindow(function(alltabs) {
+                $(alltabs).each(function(index, tabitem) {
+                    var url_choose = tabitem.url;
+                    var tabId_choose = tabitem.id;
+                    chrome.tabs.update(tabId_choose, { highlighted: false });
+                    if (url_choose.indexOf(emailid) !== -1) {
+                        chrome.tabs.update(tabId_choose, { highlighted: true });
+                        // chrome.tabs.reload(tabId_choose, function() {});
+                        $("td[data-siteinfo='"+ tdkey +"']").remove();
+                        return;
+                    }
+                });
+            });
         });
         return true;
     }  
 
-    if (request.action == 'checkEmailIsSCan') {
+    if (request.action == 'checkEmailIsScan') {
         var emailuniqueid = request.uniqueid;
         var msg = 'faild';
-        checkEmailIsSCan(emailuniqueid).then(function(res) {
+        checkEmailIsScan(emailuniqueid).then(function(res) {
             if (res.data === true) {
                 msg = 'success';
             }
@@ -302,14 +320,36 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
     if (request.action == 'getJumpInfo') {
         var emailuniqueid = request.uniqueid;
+        var emailid = request.emailid;
         sendResponse({ data:{ status: cacheWorker('get', 'jumpstatus_' + emailuniqueid), url: cacheWorker('get', 'landingpage_' + emailuniqueid)}});
+        return true;
+    }    
+
+    if (request.action == 'getEmailUniqueidByID') {
+        var emailid = request.emailid;
+        var msg = 'faild';
+        getEmailUniqueidByID(emailid).then(function(res) {
+            if (res.data) {
+                msg = res.data;
+            }
+            sendResponse({ data:msg});
+        });
         return true;
     }
 
     if (request.action == 'getErrorMatch') {
         var emailuniqueid = request.uniqueid;
+        var emailid = request.emailid;
         sendResponse({ data: cacheWorker('get', 'error_match_' + emailuniqueid) });
         return true;
+    }    
+
+    if (request.action == 'closeCurrentTab') {
+        var emailuniqueid = request.uniqueid;
+        var site = request.site;
+        var merchantid = request.merchantid;
+        chrome.tabs.remove(sender.tab.id, function() {
+        });
     }
 
     if (request.action == 'getIsHide') {
@@ -323,6 +363,14 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
 });
 
+function closeCurrentTab()
+{
+    chrome.tabs.getCurrent(function(tab) {
+        console.log(tab);
+        
+    });
+}
+
 
 //Login
 function Login(user, pass) {
@@ -335,14 +383,19 @@ function getEmailMatchInfo(emailuniqueid) {
     return ajaxApi(apiurl);
 }
 
-//add remove log
-function checkEmailIsSCan(emailuniqueid) {
-    var apiurl = "https://go.soarinfotech.com/api.php?action=checkEmailIsSCan&uniqueid=" + emailuniqueid;
+//Scan Email check
+function checkEmailIsScan(emailuniqueid) {
+    var apiurl = "https://go.soarinfotech.com/api.php?action=checkEmailIsScan&uniqueid=" + emailuniqueid;
     return ajaxApi(apiurl);
 }
 //add remove log
 function addRemoveLog(emailuniqueid, site, merchantid) {
     var apiurl = "https://go.soarinfotech.com/api.php?action=addRemoveLog&uniqueid=" + emailuniqueid + "&site=" + site + "&merchantid=" + merchantid;
+    return ajaxApi(apiurl);
+}
+
+function getEmailUniqueidByID(emailid) {
+    var apiurl = "https://go.soarinfotech.com/api.php?action=getEmailUniqueidByID&emailid=" + emailid;
     return ajaxApi(apiurl);
 }
 
